@@ -35,7 +35,7 @@ body,html{margin:0;padding:0;height:100%;font-family:Inter,system-ui,Segoe UI,Ro
 </div>
 
 <script>
-// Default accounts
+// Initialize accounts
 let accounts = JSON.parse(localStorage.getItem('accounts')) || [
   {badge:'25256', pin:'7219', admin:true}
 ];
@@ -55,22 +55,22 @@ loginBtn.addEventListener('click',()=>{
   const pin = pinEl.value.trim();
   let allAccounts = JSON.parse(localStorage.getItem('accounts')) || [];
   const match = allAccounts.find(a=>a.badge===badge && a.pin===pin);
-  if(match){
-    statusEl.textContent="Login successful!";
-    statusEl.style.color='var(--accent)';
 
-    // If admin account, show add account section but do NOT redirect
+  if(match){
+    // Clear previous color
+    statusEl.style.color = 'var(--accent)';
+
     if(match.admin){
+      // Admin: show add account section only, do NOT redirect
       addSection.style.display='flex';
-      statusEl.textContent="Admin logged in — create new accounts below";
+      statusEl.textContent="Admin logged in — create new accounts below.";
     } else {
-      // Non-admin users redirect to page.html
-      setTimeout(()=>{
-        window.location.href='page.html';
-      },500);
+      // Normal account: redirect to page.html
+      statusEl.textContent="Login successful! Redirecting...";
+      setTimeout(()=>{window.location.href='page.html';},500);
     }
 
-    // Clear input fields
+    // Clear inputs
     badgeEl.value=''; pinEl.value='';
 
   } else {
@@ -79,7 +79,7 @@ loginBtn.addEventListener('click',()=>{
   }
 });
 
-// Add new account (only for admin)
+// Add new account (only admin)
 addBtn.addEventListener('click',()=>{
   const nb = newBadgeEl.value.trim();
   const np = newPinEl.value.trim();
