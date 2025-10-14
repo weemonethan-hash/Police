@@ -9,7 +9,7 @@
   --bg:#071019; --panel:#0b1420; --muted:#8ea3b3; --accent:#7ee3a8; --danger:#ef6b6b;
 }
 body,html{margin:0;padding:0;height:100%;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;background:linear-gradient(180deg,var(--bg),#041018);color:#e6f3f5;display:flex;justify-content:center;align-items:center;}
-.login-card{background:var(--panel);padding:32px;border-radius:14px;box-shadow:0 8px 26px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03);width:320px;display:flex;flex-direction:column;gap:16px;}
+.login-card{background:var(--panel);padding:32px;border-radius:14px;box-shadow:0 8px 26px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03);width:340px;display:flex;flex-direction:column;gap:16px;}
 .login-card h2{margin:0 0 12px 0;text-align:center;}
 .login-card input{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff;outline:none;width:100%;}
 .login-card button{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--accent);font-weight:600;cursor:pointer;}
@@ -24,7 +24,7 @@ body,html{margin:0;padding:0;height:100%;font-family:Inter,system-ui,Segoe UI,Ro
   <input type="text" id="badge" placeholder="Badge Number">
   <input type="password" id="pin" placeholder="PIN">
   <button id="loginBtn">Login</button>
-  <div class="muted" id="status">Use badge 25256 / PIN 7219</div>
+  <div class="muted" id="status">Use your badge number and pin to login</div>
 
   <div class="add-account" id="addAccountSection" style="display:none;">
     <h3>Add Account</h3>
@@ -57,11 +57,19 @@ loginBtn.addEventListener('click',()=>{
   const match = allAccounts.find(a=>a.badge===badge && a.pin===pin);
   if(match){
     statusEl.textContent="Login successful!";
-    // Show add account section only for default account
-    if(badge==='25256' && pin==='7219') addSection.style.display='flex';
     // Save login flag
     localStorage.setItem('loggedIn',badge);
-    setTimeout(()=>{window.location.href='page.html';},800);
+
+    // Redirect to page.html after short delay
+    setTimeout(()=>{
+      window.location.href='page.html';
+    },500);
+
+    // Show add account section only for default account
+    if(badge==='25256' && pin==='7219'){
+      addSection.style.display='flex';
+    }
+
   } else {
     statusEl.textContent="Invalid badge or PIN!";
     statusEl.style.color='var(--danger)';
