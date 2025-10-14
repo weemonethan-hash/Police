@@ -24,7 +24,7 @@ body,html{margin:0;padding:0;height:100%;font-family:Inter,system-ui,Segoe UI,Ro
   <input type="text" id="badge" placeholder="Badge Number">
   <input type="password" id="pin" placeholder="PIN">
   <button id="loginBtn">Login</button>
-  <div class="muted" id="status">Use your badge number and pin to login</div>
+  <div class="muted" id="status">Use badge 25256 / PIN 7219 to create accounts</div>
 
   <div class="add-account" id="addAccountSection" style="display:none;">
     <h3>Add Account</h3>
@@ -37,7 +37,7 @@ body,html{margin:0;padding:0;height:100%;font-family:Inter,system-ui,Segoe UI,Ro
 <script>
 // Default accounts
 let accounts = JSON.parse(localStorage.getItem('accounts')) || [
-  {badge:'25256', pin:'7219'}
+  {badge:'25256', pin:'7219', admin:true}
 ];
 localStorage.setItem('accounts', JSON.stringify(accounts));
 
@@ -57,18 +57,21 @@ loginBtn.addEventListener('click',()=>{
   const match = allAccounts.find(a=>a.badge===badge && a.pin===pin);
   if(match){
     statusEl.textContent="Login successful!";
-    // Save login flag
-    localStorage.setItem('loggedIn',badge);
+    statusEl.style.color='var(--accent)';
 
-    // Redirect to page.html after short delay
-    setTimeout(()=>{
-      window.location.href='page.html';
-    },500);
-
-    // Show add account section only for default account
-    if(badge==='25256' && pin==='7219'){
+    // If admin account, show add account section but do NOT redirect
+    if(match.admin){
       addSection.style.display='flex';
+      statusEl.textContent="Admin logged in — create new accounts below";
+    } else {
+      // Non-admin users redirect to page.html
+      setTimeout(()=>{
+        window.location.href='page.html';
+      },500);
     }
+
+    // Clear input fields
+    badgeEl.value=''; pinEl.value='';
 
   } else {
     statusEl.textContent="Invalid badge or PIN!";
@@ -76,14 +79,14 @@ loginBtn.addEventListener('click',()=>{
   }
 });
 
-// Add new account (only for default account)
+// Add new account (only for admin)
 addBtn.addEventListener('click',()=>{
   const nb = newBadgeEl.value.trim();
   const np = newPinEl.value.trim();
   if(!nb || !np){alert('Fill both fields'); return;}
   let allAccounts = JSON.parse(localStorage.getItem('accounts')) || [];
   if(allAccounts.find(a=>a.badge===nb)){alert('Badge already exists'); return;}
-  allAccounts.push({badge:nb, pin:np});
+  allAccounts.push({badge:nb, pin:np, admin:false});
   localStorage.setItem('accounts',JSON.stringify(allAccounts));
   alert('Account added: ' + nb);
   newBadgeEl.value=''; newPinEl.value='';
