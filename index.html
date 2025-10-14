@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login · Compass App</title>
+<style>
+:root{
+  --bg:#071019; --panel:#0b1420; --muted:#8ea3b3; --accent:#7ee3a8; --danger:#ef6b6b;
+}
+body,html{margin:0;padding:0;height:100%;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;background:linear-gradient(180deg,var(--bg),#041018);color:#e6f3f5;display:flex;justify-content:center;align-items:center;}
+.login-card{background:var(--panel);padding:32px;border-radius:14px;box-shadow:0 8px 26px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03);width:320px;display:flex;flex-direction:column;gap:16px;}
+.login-card h2{margin:0 0 12px 0;text-align:center;}
+.login-card input{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:#fff;outline:none;width:100%;}
+.login-card button{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:var(--accent);font-weight:600;cursor:pointer;}
+.login-card .muted{color:var(--muted);font-size:.9rem;text-align:center;}
+.add-account{display:flex;gap:8px;flex-direction:column;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);}
+.add-account input{padding:6px;}
+</style>
+</head>
+<body>
+<div class="login-card">
+  <h2>Compass App Login</h2>
+  <input type="text" id="badge" placeholder="Badge Number">
+  <input type="password" id="pin" placeholder="PIN">
+  <button id="loginBtn">Login</button>
+  <div class="muted" id="status">Use badge 25256 / PIN 7219</div>
+
+  <div class="add-account" id="addAccountSection" style="display:none;">
+    <h3>Add Account</h3>
+    <input type="text" id="newBadge" placeholder="New Badge">
+    <input type="text" id="newPin" placeholder="New PIN">
+    <button id="addBtn">Add Account</button>
+  </div>
+</div>
+
+<script>
+// Default accounts
+let accounts = JSON.parse(localStorage.getItem('accounts')) || [
+  {badge:'25256', pin:'7219'}
+];
+localStorage.setItem('accounts', JSON.stringify(accounts));
+
+const badgeEl = document.getElementById('badge');
+const pinEl = document.getElementById('pin');
+const loginBtn = document.getElementById('loginBtn');
+const statusEl = document.getElementById('status');
+const addSection = document.getElementById('addAccountSection');
+const newBadgeEl = document.getElementById('newBadge');
+const newPinEl = document.getElementById('newPin');
+const addBtn = document.getElementById('addBtn');
+
+loginBtn.addEventListener('click',()=>{
+  const badge = badgeEl.value.trim();
+  const pin = pinEl.value.trim();
+  let allAccounts = JSON.parse(localStorage.getItem('accounts')) || [];
+  const match = allAccounts.find(a=>a.badge===badge && a.pin===pin);
+  if(match){
+    statusEl.textContent="Login successful!";
+    // Show add account section only for default account
+    if(badge==='25256' && pin==='7219') addSection.style.display='flex';
+    // Save login flag
+    localStorage.setItem('loggedIn',badge);
+    setTimeout(()=>{window.location.href='page.html';},800);
+  } else {
+    statusEl.textContent="Invalid badge or PIN!";
+    statusEl.style.color='var(--danger)';
+  }
+});
+
+// Add new account (only for default account)
+addBtn.addEventListener('click',()=>{
+  const nb = newBadgeEl.value.trim();
+  const np = newPinEl.value.trim();
+  if(!nb || !np){alert('Fill both fields'); return;}
+  let allAccounts = JSON.parse(localStorage.getItem('accounts')) || [];
+  if(allAccounts.find(a=>a.badge===nb)){alert('Badge already exists'); return;}
+  allAccounts.push({badge:nb, pin:np});
+  localStorage.setItem('accounts',JSON.stringify(allAccounts));
+  alert('Account added: ' + nb);
+  newBadgeEl.value=''; newPinEl.value='';
+});
+</script>
+</body>
+</html>
