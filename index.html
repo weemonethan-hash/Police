@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Compass + Street + Plates (Dark)</title>
+<style>
+  :root{
+    --bg:#071019; --panel:#0b1420; --muted:#8ea3b3; --accent:#7ee3a8; --danger:#ef6b6b;
+    --glass: rgba(255,255,255,0.03);
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#041018);color:#e6f3f5;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;}
+  .wrap{max-width:980px;margin:18px auto;padding:14px;box-sizing:border-box;}
+  .card{background:linear-gradient(180deg,var(--panel),#05121a);border-radius:14px;padding:14px;margin-bottom:14px;box-shadow:0 8px 26px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.03)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  h2{margin:0 0 8px 0;font-size:1rem}
+  .muted{color:var(--muted);font-size:.92rem}
+  .controls{display:flex;gap:8px;align-items:center;}
+  button{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:10px;color:var(--accent);font-weight:600}
+  input,select,textarea{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:10px;color:inherit;outline:none}
+  .split{display:flex;gap:12px}
+  .left{flex:1;min-width:240px}
+  .right{width:260px;min-width:220px}
+  /* compass */
+  .compass-wrap{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .compass{
+    width:260px;height:260px;border-radius:50%;position:relative;display:grid;place-items:center;
+    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.02), transparent 10%), linear-gradient(180deg,#07121a,#07171a);
+    border:1px solid rgba(255,255,255,0.03);box-shadow:inset 0 -8px 20px rgba(0,0,0,0.6)
+  }
+  .dial{width:92%;height:92%;border-radius:50%;transform:rotate(0deg);transition:transform .28s cubic-bezier(.2,.9,.2,1)}
+  .needle{position:absolute;width:100%;height:100%;display:grid;place-items:center;pointer-events:none}
+  .readout{min-width:120px;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);text-align:center}
+  .deg{font-size:2rem;font-weight:700;color:var(--accent)}
+  .cardinal{font-size:1.05rem;margin-top:4px}
+  .small{font-size:.85rem;color:var(--muted);margin-top:6px}
+  /* street */
+  .street-name{font-size:1.05rem;font-weight:700}
+  .coords{font-size:.9rem;color:var(--muted)}
+  /* plates */
+  .plates-controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .plates-list{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;padding-right:6px}
+  .plate-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border:1px solid rgba(255,255,255,0.02)}
+  .plate-meta{display:flex;flex-direction:column}
+  .plate-code{font-weight:700;color:#fff}
+  .plate-flag{font-size:.85rem;color:var(--muted)}
+  .icon-btn{background:transparent;border:none;color:var(--muted);padding:6px;border-radius:8px}
+  .flagged{color:var(--danger);font-weight:800}
+  .top-actions{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap}
+  .search{flex:1}
+  .note{font-size:.82rem;color:var(--muted);margin-top:8px}
+  @media (max-width:720px){
+    .split{flex-direction:column}
+    .right{width:100%}
+    .compass{width:210px;height:210px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Header -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <h2>Compass · Street · Plates</h2>
+        <div class="muted">Live compass (auto +90° offset), live street name (reverse geocoding), and plate manager — all on one page.</div>
+      </div>
+      <div class="controls">
+        <button id="btnEnable">Enable Compass</button>
+        <button id="btnLocate">Start Location</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="split">
+    <div class="left">
+      <!-- Compass -->
+      <div class="card">
+        <div class="compass-wrap">
+          <div class="compass" aria-hidden="true">
+            <div id="dial" class="dial" title="Compass dial">
+              <!-- simple svg dial -->
+              <svg viewBox="-50 -50 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img">
+                <circle cx="0" cy="0" r="48" fill="none" stroke="rgba(255,255,255,0.03)"/>
+                <!-- cardinal labels -->
+                <text x="0" y="-40" text-anchor="middle" font-size="6" fill="#e6eef5">N</text>
+                <text x="0" y="44" text-anchor="middle" font-size="6" fill="#e6eef5">S</text>
+                <text x="44" y="2" text-anchor="middle" font-size="6" fill="#e6eef5">E</text>
+                <text x="-44" y="2" text-anchor="middle" font-size="6" fill="#e6eef5">W</text>
+              </svg>
+            </div>
+            <div class="needle">
+              <svg viewBox="-50 -50 100 100" width="60%" height="60%" preserveAspectRatio="xMidYMid meet">
+                <path d="M0,-38 L6,0 L0,-8 L-6,0 Z" fill="#ef4444"/>
+                <path d="M0,38 L6,0 L0,8 L-6,0 Z" fill="#071019"/>
+                <circle cx="0" cy="0" r="3.2" fill="var(--accent)"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="readout" role="status" aria-live="polite">
+            <div class="deg" id="deg">--°</div>
+            <div class="cardinal" id="cardinal">—</div>
+            <div class="small">Displayed = measured heading + <strong id="offsetLabel">90</strong>°</div>
+            <div style="margin-top:8px;display:flex;gap:8px;align-items:center;justify-content:center">
+              <label class="muted" for="offsetInput">Offset</label>
+              <input id="offsetInput" type="number" value="90" min="-180" max="180" style="width:80px"/>
+              <button id="applyOffset">Apply</button>
+            </div>
+            <div class="note" id="compassNote">On iOS Safari tap "Enable Compass" and allow Motion & Orientation.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Street -->
+      <div class="card">
+        <h2>Live Street</h2>
+        <div class="muted">Uses device GPS + OpenStreetMap reverse-geocoding. Internet required for names. Will show coordinates if no internet.</div>
+        <div style="margin-top:12px">
+          <div class="street-name" id="streetName">—</div>
+          <div class="coords" id="coords">Lat: — · Lon: — · Accuracy: —</div>
+          <div style="margin-top:10px" class="muted">Reverse geocoding status: <span id="geocodeStatus">idle</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plates Manager -->
+    <div class="right">
+      <div class="card">
+        <h2>Plates</h2>
+        <div class="muted">Save licence plates, add a flag/reason, search, and persist locally.</div>
+
+        <div class="plates-controls" style="margin-top:10px">
+          <input id="plateInput" placeholder="Plate (e.g. AB12 XYZ)" style="flex:1" />
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <input id="flagInput" placeholder="Flag / reason (optional)" style="flex:1"/>
+          <button id="savePlate">Save</button>
+        </div>
+
+        <div class="top-actions" style="margin-top:10px">
+          <input id="searchInput" class="search" placeholder="Search plates or flags"/>
+          <button id="clearAll">Clear all</button>
+        </div>
+
+        <div class="plates-list" id="platesList" aria-live="polite" ></div>
+        <div class="note">Plates are stored locally on this device. No data is sent anywhere by default.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:28px"></div>
+</div>
+
+<script>
+(() => {
+  // --- COMPASS LOGIC ---
+  const btnEnable = document.getElementById('btnEnable');
+  const degEl = document.getElementById('deg');
+  const cardEl = document.getElementById('cardinal');
+  const dial = document.getElementById('dial');
+  const offsetInput = document.getElementById('offsetInput');
+  const applyOffset = document.getElementById('applyOffset');
+  const offsetLabel = document.getElementById('offsetLabel');
+  const compassNote = document.getElementById('compassNote');
+
+  let extraOffset = Number(offsetInput.value) || 90;
+  offsetLabel.textContent = (extraOffset>=0?'+':'')+extraOffset;
+
+  applyOffset.addEventListener('click', ()=>{
+    extraOffset = Number(offsetInput.value) || 0;
+    offsetLabel.textContent = (extraOffset>=0?'+':'')+extraOffset;
+  });
+
+  let smoothedHeading = null;
+  const alpha = 0.22;
+
+  function normalize(d){
+    return (d % 360 + 360) % 360;
+  }
+  function shortestDiff(a,b){
+    let d = ((b - a + 540) % 360) - 180;
+    return d;
+  }
+  function headingToCardinal(h){
+    const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+    return dirs[Math.floor(((h + 11.25) % 360) / 22.5)];
+  }
+  function updateUI(display){
+    dial.style.transform = `rotate(${-display}deg)`;
+    degEl.textContent = Math.round(display)+"°";
+    cardEl.textContent = headingToCardinal(display);
+  }
+  function headingFromEvent(e){
+    if (typeof e.webkitCompassHeading === "number") return e.webkitCompassHeading;
+    if (typeof e.alpha === "number") {
+      return normalize(360 - e.alpha);
+    }
+    return null;
+  }
+  function handleRaw(raw){
+    if (typeof raw !== "number") return;
+    let display = normalize(raw + extraOffset);
+    if (smoothedHeading === null) smoothedHeading = display;
+    else {
+      const diff = shortestDiff(smoothedHeading, display);
+      smoothedHeading = normalize(smoothedHeading + diff * alpha);
+    }
+    updateUI(smoothedHeading);
+  }
+  function onDeviceOrientation(e){ 
+    const raw = headingFromEvent(e);
+    if (raw === null) {
+      compassNote.textContent = "No compass data available on this browser/device.";
+      return;
+    }
+    compassNote.textContent = "Compass active.";
+    handleRaw(raw);
+  }
+  function startCompassListeners(){
+    window.addEventListener('deviceorientation', onDeviceOrientation, true);
+    window.addEventListener('deviceorientationabsolute', onDeviceOrientation, true);
+  }
+
+  async function enableCompass(){
+    compassNote.textContent = "Requesting permission...";
+    try {
+      if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function"){
+        const p = await DeviceOrientationEvent.requestPermission();
+        if (p !== "granted") { compassNote.textContent = "Permission denied."; return; }
+        startCompassListeners();
+        compassNote.textContent = "Permission granted — waiting for readings.";
+      } else {
+        startCompassListeners();
+        compassNote.textContent = "Listeners attached — waiting for readings.";
+      }
+    } catch (err){
+      console.error(err);
+      compassNote.textContent = "Error obtaining permission: " + (err.message || err);
+    }
+  }
+
+  btnEnable.addEventListener('click', enableCompass);
+  // auto attach on non-iOS
+  if (!(typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function")){
+    startCompassListeners();
+    compassNote.textContent = "Listeners attached — allow motion access if prompted.";
+  }
+
+  // fallback keyboard simulation if no sensor
+  let simulated = 0;
+  window.addEventListener('keydown', (ev)=>{
+    if (smoothedHeading !== null) return;
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft'){
+      simulated += (ev.key === 'ArrowRight' ? 5 : -5);
+      simulated = normalize(simulated);
+      handleRaw(simulated);
+      compassNote.textContent = "Simulated heading (no sensor)";
+    }
+  });
+
+  // --- LOCATION & REVERSE GEOCODING ---
+  const btnLocate = document.getElementById('btnLocate');
+  const streetNameEl = document.getElementById('streetName');
+  const coordsEl = document.getElementById('coords');
+  const geocodeStatus = document.getElementById('geocodeStatus');
+
+  let watchId = null;
+  let lastFetchTime = 0;
+  async function reverseGeocode(lat, lon){
+    // use OpenStreetMap Nominatim
+    const now = Date.now();
+    // throttle requests to >= 3s apart
+    if (now - lastFetchTime < 3000) return;
+    lastFetchTime = now;
+    geocodeStatus.textContent = 'fetching...';
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&format=jsonv2`;
+      const r = await fetch(url, {headers:{'Accept':'application/json'}});
+      if (!r.ok) throw new Error('HTTP '+r.status);
+      const j = await r.json();
+      if (j && j.address){
+        // prioritize road/street, then pedestrian, then neighbourhood, then town/city
+        const a = j.address;
+        const street = a.road || a.pedestrian || a.cycleway || a.footway || a.neighbourhood || a.suburb || a.village || a.town || a.city || null;
+        const place = (street ? street : (a.town || a.city || a.village || '')) + (a.state ? (', ' + a.state) : '');
+        streetNameEl.textContent = street ? place : (j.display_name || '—');
+        geocodeStatus.textContent = 'ok';
+      } else {
+        geocodeStatus.textContent = 'no address';
+        streetNameEl.textContent = j.display_name || '—';
+      }
+    } catch (err){
+      console.error(err);
+      geocodeStatus.textContent = 'error';
+      streetNameEl.textContent = 'Unable to fetch name (no internet or rate limit)';
+    }
+  }
+
+  function handlePosition(pos){
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const acc = pos.coords.accuracy;
+    coordsEl.textContent = `Lat: ${lat.toFixed(6)} · Lon: ${lon.toFixed(6)} · Acc: ${Math.round(acc)}m`;
+    // attempt reverse geocoding
+    reverseGeocode(lat, lon);
+  }
+
+  function handlePosError(err){
+    coordsEl.textContent = `Location error: ${err.message}`;
+    geocodeStatus.textContent = 'error';
+  }
+
+  function startLocation(){
+    if (!('geolocation' in navigator)){
+      coordsEl.textContent = 'Geolocation not available in this browser.';
+      return;
+    }
+    if (watchId !== null) return;
+    watchId = navigator.geolocation.watchPosition(handlePosition, handlePosError, {enableHighAccuracy:true, maximumAge:2000, timeout:8000});
+    btnLocate.textContent = 'Stop Location';
+    geocodeStatus.textContent = 'watching';
+  }
+  function stopLocation(){
+    if (watchId !== null){
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      btnLocate.textContent = 'Start Location';
+      geocodeStatus.textContent = 'stopped';
+    }
+  }
+  btnLocate.addEventListener('click', ()=>{
+    if (watchId === null) startLocation(); else stopLocation();
+  });
+
+  // --- PLATES MANAGER ---
+  const plateInput = document.getElementById('plateInput');
+  const flagInput = document.getElementById('flagInput');
+  const savePlateBtn = document.getElementById('savePlate');
+  const platesList = document.getElementById('platesList');
+  const searchInput = document.getElementById('searchInput');
+  const clearAllBtn = document.getElementById('clearAll');
+
+  const STORAGE_KEY = 'plates_v1';
+  function loadPlates(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      return JSON.parse(raw);
+    } catch(e){ return []; }
+  }
+  function savePlates(arr){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  }
+  function renderPlates(){
+    const q = (searchInput.value || '').trim().toLowerCase();
+    const arr = loadPlates();
+    const filtered = arr.filter(p => {
+      if (!q) return true;
+      return (p.plate && p.plate.toLowerCase().includes(q)) || (p.flag && p.flag.toLowerCase().includes(q));
+    }).sort((a,b)=> b.ts - a.ts);
+    platesList.innerHTML = '';
+    if (filtered.length === 0){
+      platesList.innerHTML = '<div class="muted">No plates saved</div>';
+      return;
+    }
+    filtered.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'plate-item';
+      el.innerHTML = `
+        <div class="plate-meta">
+          <div class="plate-code">${escapeHtml(item.plate)}</div>
+          <div class="plate-flag ${item.flagged ? 'flagged':''}">${item.flag ? escapeHtml(item.flag) : '<span class="muted">no flag</span>'}</div>
+          <div class="muted" style="font-size:.78rem">${new Date(item.ts).toLocaleString()}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <div style="display:flex;gap:6px">
+            <button class="icon-btn" data-action="toggleFlag" title="Toggle flag">${item.flagged ? '🚩' : '⚑'}</button>
+            <button class="icon-btn" data-action="edit" title="Edit">✏️</button>
+            <button class="icon-btn" data-action="delete" title="Delete">🗑️</button>
+          </div>
+          <div style="font-size:.78rem;color:var(--muted)">${item.id}</div>
+        </div>
+      `;
+      // event delegation on buttons
+      el.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', (ev)=>{
+          ev.stopPropagation();
+          const action = btn.getAttribute('data-action');
+          if (action === 'delete') {
+            if (!confirm('Delete plate "'+item.plate+'"?')) return;
+            const newArr = loadPlates().filter(p => p.id !== item.id);
+            savePlates(newArr); renderPlates();
+          } else if (action === 'toggleFlag') {
+            const arr2 = loadPlates().map(p => {
+              if (p.id === item.id) p.flagged = !p.flagged;
+              return p;
+            });
+            savePlates(arr2); renderPlates();
+          } else if (action === 'edit') {
+            const newPlate = prompt('Edit plate:', item.plate);
+            if (newPlate === null) return;
+            const newFlag = prompt('Edit flag/reason (leave blank for none):', item.flag || '');
+            const arr3 = loadPlates().map(p=> { if (p.id === item.id){ p.plate = newPlate.trim(); p.flag = newFlag ? newFlag.trim() : ''; p.ts = Date.now(); } return p; });
+            savePlates(arr3); renderPlates();
+          }
+        });
+      });
+
+      platesList.appendChild(el);
+    });
+  }
+
+  function escapeHtml(s){
+    if (!s) return '';
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  savePlateBtn.addEventListener('click', ()=>{
+    const plate = (plateInput.value || '').trim();
+    if (!plate) { alert('Enter a plate'); plateInput.focus(); return; }
+    const flag = (flagInput.value || '').trim();
+    const arr = loadPlates();
+    const item = { id: genId(), plate, flag, flagged: false, ts: Date.now() };
+    arr.push(item); savePlates(arr);
+    plateInput.value = ''; flagInput.value = '';
+    renderPlates();
+  });
+
+  searchInput.addEventListener('input', renderPlates);
+  clearAllBtn.addEventListener('click', ()=>{
+    if (!confirm('Clear all saved plates?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    renderPlates();
+  });
+
+  function genId(){ return 'p-'+Math.random().toString(36).slice(2,9); }
+
+  // initial render
+  renderPlates();
+
+  // --- misc: auto-save offset to localStorage? keep transient for now ---
+  // Save offset to localStorage
+  const OFFSET_KEY = 'compass_offset_v1';
+  const savedOffset = localStorage.getItem(OFFSET_KEY);
+  if (savedOffset !== null) {
+    extraOffset = Number(savedOffset) || extraOffset;
+    offsetInput.value = extraOffset;
+    offsetLabel.textContent = (extraOffset>=0?'+':'')+extraOffset;
+  }
+  applyOffset.addEventListener('click', ()=> {
+    localStorage.setItem(OFFSET_KEY, String(extraOffset));
+  });
+
+  // expose for debugging
+  window.__app = { startLocation, stopLocation, loadPlates, savePlates, enableCompass };
+
+})();
+</script>
+</body>
+</html>
