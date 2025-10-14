@@ -50,44 +50,43 @@ const newBadgeEl = document.getElementById('newBadge');
 const newPinEl = document.getElementById('newPin');
 const addBtn = document.getElementById('addBtn');
 
-loginBtn.addEventListener('click',()=>{
+loginBtn.addEventListener('click', ()=>{
   const badge = badgeEl.value.trim();
   const pin = pinEl.value.trim();
   let allAccounts = JSON.parse(localStorage.getItem('accounts')) || [];
-  const match = allAccounts.find(a=>a.badge===badge && a.pin===pin);
+  const match = allAccounts.find(a => a.badge === badge && a.pin === pin);
 
   if(match){
-    // Clear previous color
-    statusEl.style.color = 'var(--accent)';
+    badgeEl.value = '';
+    pinEl.value = '';
 
     if(match.admin){
-      // Admin: show add account section only, do NOT redirect
-      addSection.style.display='flex';
-      statusEl.textContent="Admin logged in — create new accounts below.";
+      // Admin cannot access page.html
+      addSection.style.display = 'flex';
+      statusEl.textContent = "Admin logged in — create new accounts below.";
+      statusEl.style.color = 'var(--accent)';
     } else {
-      // Normal account: redirect to page.html
-      statusEl.textContent="Login successful! Redirecting...";
+      // Normal user redirects
+      statusEl.textContent = "Login successful! Redirecting...";
+      statusEl.style.color = 'var(--accent)';
       setTimeout(()=>{window.location.href='page.html';},500);
     }
 
-    // Clear inputs
-    badgeEl.value=''; pinEl.value='';
-
   } else {
-    statusEl.textContent="Invalid badge or PIN!";
-    statusEl.style.color='var(--danger)';
+    statusEl.textContent = "Invalid badge or PIN!";
+    statusEl.style.color = 'var(--danger)';
   }
 });
 
 // Add new account (only admin)
-addBtn.addEventListener('click',()=>{
+addBtn.addEventListener('click', ()=>{
   const nb = newBadgeEl.value.trim();
   const np = newPinEl.value.trim();
   if(!nb || !np){alert('Fill both fields'); return;}
   let allAccounts = JSON.parse(localStorage.getItem('accounts')) || [];
-  if(allAccounts.find(a=>a.badge===nb)){alert('Badge already exists'); return;}
-  allAccounts.push({badge:nb, pin:np, admin:false});
-  localStorage.setItem('accounts',JSON.stringify(allAccounts));
+  if(allAccounts.find(a => a.badge === nb)){alert('Badge already exists'); return;}
+  allAccounts.push({badge: nb, pin: np, admin:false});
+  localStorage.setItem('accounts', JSON.stringify(allAccounts));
   alert('Account added: ' + nb);
   newBadgeEl.value=''; newPinEl.value='';
 });
