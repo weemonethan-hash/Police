@@ -1,100 +1,247 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Traffic Jam Fever - Levels</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Camera Proximity Beeper</title>
 <style>
-  body{margin:0;font-family:sans-serif;background:#eee;overflow:hidden}
-  #ui{background:#fff;padding:8px;border-bottom:1px solid #ccc;display:flex;gap:8px;align-items:center}
-  button{padding:6px 10px;cursor:pointer}
-  #info{margin-left:auto;font-size:14px;color:#555}
-  canvas{background:#f7f7f7;display:block;margin:auto;border:1px solid #aaa}
+  body { font-family: Arial, Helvetica, sans-serif; margin: 12px; background:#fff; color:#111; }
+  #controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  #videoContainer { position:relative; width:100%; max-width:640px; margin-bottom:12px; }
+  video#video { width:100%; height:auto; background:#000; transform:scaleX(-1); } /* mirrored for user-friendly view */
+  canvas#overlay { position:absolute; left:0; top:0; pointer-events:none; transform:scaleX(-1); }
+  #status { font-size:0.9rem; color:#333; }
+  label { font-size:0.9rem; }
+  input[type=range] { width:160px; }
+  button { padding:6px 10px; }
 </style>
 </head>
 <body>
-<div id="ui">
-  <button id="drawBtn">Draw</button>
-  <button id="eraseBtn">Erase</button>
-  <button id="startBtn">Start</button>
-  <button id="nextBtn">Next Level</button>
-  <span id="levelInfo">Level 1</span>
-  <div id="info">Red = heavy traffic. Draw bypass roads.</div>
+
+<div id="controls">
+  <button id="startBtn">Start (allow camera & model)</button>
+  <button id="stopBtn" disabled>Stop</button>
+  <label><input type="checkbox" id="debugChk"> Debug (show camera + overlay)</label>
+  <label>Min detect %: <input id="minFrac" type="range" min="0.002" max="0.05" step="0.001" value="0.006"></label>
+  <label>Max detect %: <input id="maxFrac" type="range" min="0.02" max="0.5" step="0.01" value="0.2"></label>
+  <div id="status">idle</div>
 </div>
-<canvas id="c" width="900" height="600"></canvas>
+
+<div id="videoContainer" style="display:none;">
+  <video id="video" playsinline autoplay muted></video>
+  <canvas id="overlay"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.6.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
 <script>
-const canvas=document.getElementById("c"),ctx=canvas.getContext("2d");
-let w=canvas.width,h=canvas.height;
-let mode="draw",drawing=false,curPath=[],roads=[],cars=[],running=false,level=1;
-drawBtn.onclick=()=>mode="draw"; eraseBtn.onclick=()=>mode="erase";
-startBtn.onclick=()=>running=!running;
-nextBtn.onclick=()=>{level++;setupLevel(level)};
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-function addRoad(points){roads.push({pts:points,id:roads.length});}
-function draw(){
- ctx.clearRect(0,0,w,h);
- ctx.lineWidth=10;
- for(let r of roads){ctx.beginPath();ctx.strokeStyle="#333";ctx.moveTo(r.pts[0].x,r.pts[0].y);
- for(let p of r.pts)ctx.lineTo(p.x,p.y);ctx.stroke();}
- for(let car of cars){
-   ctx.save();ctx.translate(car.x,car.y);ctx.rotate(car.a);
-   ctx.fillStyle=car.red?"#d22":"#2b9";ctx.fillRect(-6,-3,12,6);ctx.restore();
- }
- if(drawing&&curPath.length>1){ctx.beginPath();ctx.strokeStyle="#222";ctx.moveTo(curPath[0].x,curPath[0].y);
- for(let p of curPath)ctx.lineTo(p.x,p.y);ctx.stroke();}
-}
-canvas.onmousedown=e=>{
- const r=canvas.getBoundingClientRect();let x=e.clientX-r.left,y=e.clientY-r.top;
- if(mode=="draw"){drawing=true;curPath=[{x,y}];}
- else if(mode=="erase"){roads=roads.filter(rd=>rd.pts.every(p=>dist(p,{x,y})>10));}
-}
-canvas.onmousemove=e=>{
- if(!drawing)return;const r=canvas.getBoundingClientRect();
- let x=e.clientX-r.left,y=e.clientY-r.top;let last=curPath[curPath.length-1];
- if(dist(last,{x,y})>5)curPath.push({x,y});
-}
-canvas.onmouseup=e=>{
- if(drawing){drawing=false;if(curPath.length>1)addRoad(curPath);curPath=[];}
-}
-function spawnCar(){
- if(roads.length==0)return;
- let r=roads[Math.floor(Math.random()*roads.length)];
- let a=r.pts[0],b=r.pts[r.pts.length-1];
- let s=Math.random()<0.5?a:b, t=s==a?1:-1;
- cars.push({x:s.x,y:s.y,a:Math.atan2(b.y-a.y,b.x-a.x)*t,v:1+Math.random(),r:r,i:0,red:false});
-}
-function moveCars(dt){
- for(let c of cars){
-   c.i+=c.v*dt*40;
-   let p1=c.r.pts[0],p2=c.r.pts[c.r.pts.length-1];
-   c.x=p1.x+(p2.x-p1.x)*(c.i/100);
-   c.y=p1.y+(p2.y-p1.y)*(c.i/100);
-   c.a=Math.atan2(p2.y-p1.y,p2.x-p1.x);
-   if(c.i>100)c.i=0;
- }
- let cap=5;
- for(let r of roads){
-   let count=cars.filter(c=>c.r==r&&c.i<100).length;
-   for(let c of cars)if(c.r==r)c.red=count>cap;
- }
-}
-function loop(ts){
- draw();
- if(running){
-   if(Math.random()<0.02*level)spawnCar();
-   moveCars(0.016);
- }
- requestAnimationFrame(loop);
-}
-function setupLevel(n){
- roads=[];cars=[];running=false;document.getElementById("levelInfo").innerText="Level "+n;
- if(n==1){addRoad([{x:100,y:300},{x:800,y:300}]);addRoad([{x:450,y:100},{x:450,y:500}]);}
- if(n==2){addRoad([{x:100,y:300},{x:800,y:300}]);addRoad([{x:450,y:100},{x:450,y:500}]);
-          addRoad([{x:100,y:150},{x:800,y:150}]);}
- if(n==3){addRoad([{x:100,y:300},{x:800,y:300}]);addRoad([{x:450,y:100},{x:450,y:500}]);
-          addRoad([{x:100,y:150},{x:800,y:150}]);addRoad([{x:200,y:500},{x:700,y:120}]);}
-}
-setupLevel(1);
-loop();
+(async ()=> {
+  let model = null;
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn  = document.getElementById('stopBtn');
+  const debugChk  = document.getElementById('debugChk');
+  const video = document.getElementById('video');
+  const overlay = document.getElementById('overlay');
+  const videoContainer = document.getElementById('videoContainer');
+  const status = document.getElementById('status');
+  const minFracInput = document.getElementById('minFrac');
+  const maxFracInput = document.getElementById('maxFrac');
+
+  let stream = null;
+  let running = false;
+  let detectLoopId = null;
+  let audioCtx = null;
+  let lastBeepScheduled = 0;
+
+  function log(s){ status.textContent = s; }
+
+  async function loadModel() {
+    log('loading model...');
+    model = await cocoSsd.load();
+    log('model loaded.');
+  }
+
+  async function startCamera() {
+    // prefer back camera
+    const constraintsTry = [
+      { video: { facingMode: { exact: "environment" } } },
+      { video: { facingMode: "environment" } },
+      { video: true }
+    ];
+    for (const c of constraintsTry) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: c.video, audio: false });
+        break;
+      } catch(e) {
+        // try next
+      }
+    }
+    if (!stream) throw new Error('Could not access camera.');
+    video.srcObject = stream;
+    await video.play();
+    // size overlay to video
+    overlay.width = video.videoWidth || 640;
+    overlay.height = video.videoHeight || 480;
+    overlay.style.width = video.offsetWidth + 'px';
+    overlay.style.height = video.offsetHeight + 'px';
+    videoContainer.style.display = debugChk.checked ? 'block' : 'none';
+  }
+
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    video.pause();
+    video.srcObject = null;
+  }
+
+  function ensureAudioContext() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  function beepOnce(duration = 0.08, freq = 700, when = 0) {
+    ensureAudioContext();
+    const t = audioCtx.currentTime + when;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.6, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+    o.connect(g);
+    g.connect(audioCtx.destination);
+    o.start(t);
+    o.stop(t + duration + 0.02);
+  }
+
+  function scheduleBeepsForRate(beepsPerSec, totalWindowSec = 0.9) {
+    // schedule beeps across next window
+    if (beepsPerSec <= 0) return;
+    const now = performance.now();
+    // avoid scheduling too often
+    if (now - lastBeepScheduled < (totalWindowSec * 500)) {
+      // allow rescheduling if significantly different
+    }
+    lastBeepScheduled = now;
+    const count = Math.max(1, Math.round(beepsPerSec * totalWindowSec));
+    const interval = totalWindowSec / count;
+    for (let i=0;i<count;i++){
+      beepOnce(0.06, 700, i*interval);
+    }
+  }
+
+  function computeBeepRateFromAreaFrac(areaFrac, minFrac, maxFrac) {
+    // areaFrac in [0,1], minFrac..maxFrac define mapping range
+    // below min -> single occasional beep; above max -> very rapid beeps
+    if (areaFrac <= minFrac) return 0.6; // 0.6 beeps/sec -> slow single beeps
+    const clamped = Math.min(1, (areaFrac - minFrac) / Math.max(1e-6, (maxFrac - minFrac)));
+    // map to range [0.6, 8] beeps/sec
+    return 0.6 + clamped * (8 - 0.6);
+  }
+
+  async function detectLoop() {
+    if (!running) return;
+    if (!model) {
+      log('model not loaded');
+      return;
+    }
+    try {
+      // use model.detect on video element
+      const predictions = await model.detect(video, 5);
+      // find largest bounding box area
+      const vW = video.videoWidth || overlay.width;
+      const vH = video.videoHeight || overlay.height;
+      let maxArea = 0;
+      let best = null;
+      for (const p of predictions) {
+        const [x,y,w,h] = p.bbox;
+        const area = w*h;
+        if (area > maxArea) {
+          maxArea = area;
+          best = p;
+        }
+      }
+      const areaFrac = maxArea / (vW*vH);
+      const minFrac = parseFloat(minFracInput.value);
+      const maxFrac = parseFloat(maxFracInput.value);
+      const beepRate = computeBeepRateFromAreaFrac(areaFrac, minFrac, maxFrac);
+
+      // Schedule beeps proportionally
+      scheduleBeepsForRate(beepRate);
+
+      // Debug overlay
+      if (debugChk.checked) {
+        videoContainer.style.display = 'block';
+        const ctx = overlay.getContext('2d');
+        ctx.clearRect(0,0,overlay.width,overlay.height);
+        ctx.lineWidth = 3;
+        ctx.font = '20px Arial';
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.strokeStyle = 'lime';
+        for (const p of predictions) {
+          const [x,y,w,h] = p.bbox;
+          ctx.strokeRect(x, y, w, h);
+          ctx.fillText(p.class + ' ' + Math.round(p.score*100) + '%', x+4, y+20);
+        }
+        if (best) {
+          ctx.fillStyle = 'yellow';
+          ctx.fillText('areaFrac: ' + areaFrac.toFixed(4), 10, overlay.height - 10);
+        } else {
+          ctx.fillStyle = 'yellow';
+          ctx.fillText('No object detected', 10, overlay.height - 10);
+        }
+      } else {
+        videoContainer.style.display = 'none';
+      }
+
+      log(`objects ${predictions.length} · areaFrac ${areaFrac.toFixed(4)} · beeps/sec ${beepRate.toFixed(2)}`);
+    } catch (e) {
+      console.error(e);
+      log('detection error: ' + e.message);
+    } finally {
+      // loop
+      detectLoopId = setTimeout(detectLoop, 300); // run ~3x/sec (tweakable)
+    }
+  }
+
+  startBtn.addEventListener('click', async ()=>{
+    try {
+      startBtn.disabled = true;
+      await loadModel(); // load if not already
+      await startCamera();
+      running = true;
+      stopBtn.disabled = false;
+      // user interaction may be required to unlock audio on some browsers
+      try { ensureAudioContext(); if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume(); } catch(e){}
+      detectLoop();
+    } catch (err) {
+      console.error(err);
+      log('error: ' + (err && err.message ? err.message : err));
+      startBtn.disabled = false;
+    }
+  });
+
+  stopBtn.addEventListener('click', ()=>{
+    running = false;
+    clearTimeout(detectLoopId);
+    stopCamera();
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    log('stopped');
+  });
+
+  // hide debug view on toggle
+  debugChk.addEventListener('change', ()=> {
+    videoContainer.style.display = debugChk.checked && running ? 'block' : 'none';
+  });
+
+  // simple instruction to user
+  log('idle — press Start (model will download)');
+})();
 </script>
 </body>
 </html>
